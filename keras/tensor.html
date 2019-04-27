@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page for </title>
+</head>
+<body>
+<div>
+    <canvas height="28" width="28" id='draw_area' style="border: 1px solid greenyellow" ></canvas>
+</div>
+<button id='clear-btn'>clear </button>
+<button id='predict-btn'>predict </button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/1.1.0/tf.js"></script>
+
+<script>
+    const canvas = document.querySelector('#draw_area')
+    const ctx = canvas.getContext('2d')
+    const clear_btn = document.querySelector('#clear-btn')
+    const predict_btn = document.querySelector('#predict-btn')
+
+    clear_btn.addEventListener('click', () => canvas.width = canvas.width)
+    predict_btn.addEventListener('click',  predict)
+
+    let activated = false
+    const getCoordinates = (ev) =>{
+        const {clientX, clientY} = ev
+        const {offsetLeft, offsetTop} = canvas
+        return {x: clientX - offsetLeft , y: clientY - offsetTop}
+    }
+    canvas.addEventListener('mousedown', (ev)=>{
+        activated = true
+    })
+    canvas.addEventListener('mousemove', (ev)=>{
+        if (!activated) return
+        const {x,y} = getCoordinates(ev)
+        ctx.fillRect(x, y, 1,1)
+
+    })
+    canvas.addEventListener('mouseup', (ev)=>{
+        activated = false
+    })
+    
+    function predict(){
+        const imageData = ctx.getImageData(0,0, 28, 28)
+        render(imageData)
+        const pixels = imageData.data
+        const values = consolidate(pixels)
+        const prediction = model.predict(tf.tensor2d( values, [1,784] ))
+        prediction.print()
+        tf.argMax(prediction, 1).print()
+    }
+
+    function render(pixels){
+        var t = consolidate(pixels.data)
+        var tensor = tf.tensor1d(t)
+        tensor = tf.reshape(tensor, [28, 28])
+        tensor.array()
+        .then(values => {
+            values.forEach(v => {
+                const row = v.map( x => x >0 ? 1 : '-').join('')
+                console.log(row , '               ' + Math.random())
+            })
+        })
+    }   
+    function consolidate(pixelData){
+        const arr = []
+        const pixels = Array.from(pixelData)
+        var i = 0;
+        var c = 0;
+        var isSet = false
+        while(i < pixels.length) { 
+            c = c % 4; 
+            if ( pixels[i] > 0) {
+                isSet = true
+            }
+            if(c == 3)  {
+                arr.push(isSet ? 1 : 0)
+                isSet = false
+            }
+            c++;
+            i++;
+        }
+        return arr
+    }    
+</script>
+<script>
+
+    var url = 'http://localhost:8004/saved_model/model.json'
+    window.model = {};
+    tf.loadLayersModel(url)
+    .then(m => {
+        model = m
+        console.log('model loaded', model)
+    })
+    .catch(e => {
+        console.error('model could not be loaded', e)
+    })
+    
+</script>
+</body>
+</html>
